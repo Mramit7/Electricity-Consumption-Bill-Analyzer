@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electricity Consumption & Bill Analyzer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Visual Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-bill-modal, #printable-bill-modal * {
+                visibility: visible;
+            }
+            #printable-bill-modal {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased bg-slate-50">
+
+    <!-- Top Header Bar -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Branding -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-amber-500 text-slate-950 rounded-xl shadow-md">
+                        <i class="fa-solid fa-bolt text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg leading-tight tracking-tight text-white">PowerPulse</h1>
+                        <p class="text-[11px] text-amber-400 font-medium">Electricity Bill & Consumption Analyzer</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Navigation Tabs -->
+                <nav class="hidden md:flex space-x-2">
+                    <button onclick="switchTab('calculator')" id="tab-btn-calculator" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 bg-amber-500 text-slate-950 shadow">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span>Calculate & Add Bill</span>
+                    </button>
+                    <button onclick="switchTab('records')" id="tab-btn-records" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200">
+                        <i class="fa-solid fa-receipt"></i>
+                        <span>Bill Records</span>
+                    </button>
+                    <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="nav-tab flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-all duration-200">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>Analytics Dashboard</span>
+                    </button>
+                </nav>
+
+                <!-- Data Utilities -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="seedDemoData()" title="Load Sample C Code Data" class="text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition flex items-center space-x-1.5 border border-slate-700 font-medium">
+                        <i class="fa-solid fa-database text-amber-400"></i>
+                        <span class="hidden sm:inline">Load Sample Data</span>
+                    </button>
+                    <button onclick="clearAllData()" title="Reset Database" class="text-xs px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 rounded-lg transition flex items-center space-x-1 border border-rose-800/50">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Bar -->
+        <div class="md:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur px-2 py-2 flex justify-around">
+            <button onclick="switchTab('calculator')" id="mobile-tab-calculator" class="mobile-nav-tab flex flex-col items-center p-2 rounded-lg text-amber-400 text-xs font-bold">
+                <i class="fa-solid fa-calculator text-base mb-1"></i>
+                <span>Calculate</span>
+            </button>
+            <button onclick="switchTab('records')" id="mobile-tab-records" class="mobile-nav-tab flex flex-col items-center p-2 rounded-lg text-slate-400 text-xs font-bold">
+                <i class="fa-solid fa-receipt text-base mb-1"></i>
+                <span>Records</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="mobile-tab-analytics" class="mobile-nav-tab flex flex-col items-center p-2 rounded-lg text-slate-400 text-xs font-bold">
+                <i class="fa-solid fa-chart-pie text-base mb-1"></i>
+                <span>Analytics</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ================= TAB 1: CALCULATOR & BILL CREATION ================= -->
+        <section id="tab-calculator" class="tab-content block space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Input Form Side -->
+                <div class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                    <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-user-plus text-amber-500"></i>
+                                Consumer Billing Entry
+                            </h2>
+                            <p class="text-xs text-slate-500">Enter meter readings to calculate tariff charges.</p>
+                        </div>
+                        <span id="auto-id-badge" class="px-3 py-1 bg-amber-50 text-amber-800 font-bold font-mono text-xs rounded-full border border-amber-200/60 shadow-sm">
+                            Auto ID: #1001
+                        </span>
+                    </div>
+
+                    <form id="billForm" onsubmit="handleFormSubmit(event)" class="space-y-5">
+                        <!-- Option Switcher: New vs Existing -->
+                        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="consumerType" value="new" checked onchange="toggleConsumerType()" class="peer sr-only">
+                                <div class="text-center py-2.5 text-xs font-bold rounded-lg text-slate-600 peer-checked:bg-white peer-checked:text-slate-900 peer-checked:shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                                    New Consumer
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="consumerType" value="existing" onchange="toggleConsumerType()" class="peer sr-only">
+                                <div class="text-center py-2.5 text-xs font-bold rounded-lg text-slate-600 peer-checked:bg-white peer-checked:text-slate-900 peer-checked:shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-users text-amber-500"></i>
+                                    Existing Consumer
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Dropdown Select for Existing Consumer -->
+                        <div id="existing-consumer-lookup" class="hidden space-y-1">
+                            <label class="block text-xs font-bold text-slate-700">Select Existing Consumer *</label>
+                            <select id="existingConsumerSelect" onchange="loadExistingConsumerData()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                                <option value="">-- Choose Existing Consumer --</option>
+                            </select>
+                        </div>
+
+                        <!-- Consumer Name & ID Inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label for="consumerName" class="block text-xs font-bold text-slate-700">Consumer Name *</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-user text-slate-400 absolute left-3.5 top-3 text-xs"></i>
+                                    <input type="text" id="consumerName" required placeholder="e.g. Ramesh Sharma" class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="consumerIdDisplay" class="block text-xs font-bold text-slate-700">Consumer ID</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-hashtag text-slate-400 absolute left-3.5 top-3 text-xs"></i>
+                                    <input type="text" id="consumerIdDisplay" readonly class="w-full pl-9 pr-3.5 py-2.5 bg-slate-100 border border-slate-200 text-slate-600 font-mono text-xs rounded-xl cursor-not-allowed font-semibold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Address -->
+                        <div class="space-y-1">
+                            <label for="consumerAddress" class="block text-xs font-bold text-slate-700">Address *</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-location-dot text-slate-400 absolute left-3.5 top-3 text-xs"></i>
+                                <input type="text" id="consumerAddress" required placeholder="e.g. Flat 4B, Sector 15, New Delhi" class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                            </div>
+                        </div>
+
+                        <!-- Meter Reading Inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label for="previousReading" class="block text-xs font-bold text-slate-700">Previous Reading (Units)</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-clock-rotate-left text-slate-400 absolute left-3.5 top-3 text-xs"></i>
+                                    <input type="number" step="0.01" id="previousReading" value="0" readonly oninput="liveCalculate()" class="w-full pl-9 pr-3.5 py-2.5 bg-slate-100 border border-slate-200 text-slate-600 font-mono text-xs rounded-xl cursor-not-allowed font-semibold">
+                                </div>
+                            </div>
+                            <div class="space-y-1">
+                                <label for="currentReading" class="block text-xs font-bold text-slate-700">Current Reading (Units) *</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-gauge-high text-slate-400 absolute left-3.5 top-3 text-xs"></i>
+                                    <input type="number" step="0.01" id="currentReading" required min="0" placeholder="e.g. 350" oninput="liveCalculate()" class="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs font-semibold focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="pt-3 flex gap-3">
+                            <button type="submit" class="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-file-invoice"></i>
+                                <span>Save & Generate Bill</span>
+                            </button>
+                            <button type="button" onclick="resetForm()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right Side: Bill Breakdown Preview -->
+                <div class="lg:col-span-5 space-y-6">
+
+                    <!-- Bill Card Container -->
+                    <div id="bill-card" class="bg-slate-900 text-white rounded-2xl p-6 shadow-xl border border-slate-800 relative overflow-hidden">
+                        <div class="absolute -right-10 -top-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                            <div>
+                                <h3 class="text-[10px] uppercase tracking-widest text-amber-400 font-extrabold">Electricity Bill Statement</h3>
+                                <p id="preview-consumer-name" class="font-bold text-lg text-white mt-0.5">Select / Fill Consumer</p>
+                            </div>
+                            <span id="preview-id-tag" class="px-2.5 py-1 bg-slate-800 text-slate-300 font-mono text-xs rounded-md border border-slate-700 font-bold">#----</span>
+                        </div>
+
+                        <!-- Consumption Trend Comparison Banner -->
+                        <div id="trend-banner" class="hidden mt-3 p-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
+                            <span id="trend-text" class="flex items-center gap-1.5"></span>
+                            <span id="trend-delta" class="font-mono"></span>
+                        </div>
+
+                        <!-- Breakdown List -->
+                        <div class="mt-4 space-y-2 text-xs">
+                            <div class="flex justify-between py-1 text-slate-300">
+                                <span>Units Consumed</span>
+                                <span id="preview-units" class="font-mono font-bold text-white">0.00 units</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-slate-300">
+                                <span>Energy Charge</span>
+                                <span id="preview-energy" class="font-mono text-white">Rs. 0.00</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-slate-300">
+                                <span>Fixed Charge</span>
+                                <span id="preview-fixed" class="font-mono text-white">Rs. 100.00</span>
+                            </div>
+                            <div class="flex justify-between py-1 text-slate-300">
+                                <span>Electricity Duty (5%)</span>
+                                <span id="preview-duty" class="font-mono text-white">Rs. 0.00</span>
+                            </div>
+                            <div class="border-t border-slate-800 pt-3 mt-3 flex justify-between items-baseline">
+                                <span class="text-sm font-bold text-amber-400 uppercase tracking-wide">Total Payable</span>
+                                <span id="preview-total" class="font-mono font-extrabold text-2xl text-amber-400">Rs. 100.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Slab Bar -->
+                        <div class="mt-5 pt-4 border-t border-slate-800/80">
+                            <p class="text-[11px] text-slate-400 mb-2 flex justify-between font-medium">
+                                <span>Progressive Slab Usage</span>
+                                <span id="preview-slab-summary" class="font-mono text-amber-400 font-bold">0 units</span>
+                            </p>
+                            <div class="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                                <div id="slab-bar-1" title="0-100 Slab (@ Rs. 3.00)" class="bg-emerald-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                <div id="slab-bar-2" title="101-200 Slab (@ Rs. 4.50)" class="bg-sky-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                <div id="slab-bar-3" title="201-500 Slab (@ Rs. 6.00)" class="bg-amber-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                <div id="slab-bar-4" title=">500 Slab (@ Rs. 7.50)" class="bg-rose-500 h-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <div class="flex text-[9px] text-slate-400 justify-between mt-1 font-mono uppercase font-semibold">
+                                <span class="text-emerald-400">0-100</span>
+                                <span class="text-sky-400">101-200</span>
+                                <span class="text-amber-400">201-500</span>
+                                <span class="text-rose-400">&gt;500</span>
+                            </div>
+                        </div>
+
+                        <!-- Open Printable Receipt Button -->
+                        <button onclick="openPrintModal()" class="no-print mt-5 w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-print"></i>
+                            <span>View & Print Bill Receipt</span>
+                        </button>
+                    </div>
+
+                    <!-- Tariff Reference Table -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                        <h4 class="text-xs uppercase tracking-wider font-extrabold text-slate-600 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-table-list text-amber-500"></i>
+                            Progressive Tariff Structure
+                        </h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="p-2.5 bg-emerald-50 text-emerald-950 rounded-xl border border-emerald-100">
+                                <span class="font-bold block text-[11px]">First 100 Units</span>
+                                <span class="font-mono text-emerald-700 font-extrabold">Rs. 3.00 / unit</span>
+                            </div>
+                            <div class="p-2.5 bg-sky-50 text-sky-950 rounded-xl border border-sky-100">
+                                <span class="font-bold block text-[11px]">101 - 200 Units</span>
+                                <span class="font-mono text-sky-700 font-extrabold">Rs. 4.50 / unit</span>
+                            </div>
+                            <div class="p-2.5 bg-amber-50 text-amber-950 rounded-xl border border-amber-100">
+                                <span class="font-bold block text-[11px]">201 - 500 Units</span>
+                                <span class="font-mono text-amber-700 font-extrabold">Rs. 6.00 / unit</span>
+                            </div>
+                            <div class="p-2.5 bg-rose-50 text-rose-950 rounded-xl border border-rose-100">
+                                <span class="font-bold block text-[11px]">Above 500 Units</span>
+                                <span class="font-mono text-rose-700 font-extrabold">Rs. 7.50 / unit</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: SAVED RECORDS ================= -->
+        <section id="tab-records" class="tab-content hidden space-y-4">
+            <!-- Table Header Controls -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-database text-amber-500"></i>
+                        Saved Electricity Records
+                    </h2>
+                    <p class="text-xs text-slate-500">Search and manage stored consumer records.</p>
+                </div>
+
+                <div class="w-full sm:w-auto flex items-center gap-2">
+                    <div class="relative flex-1 sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400 absolute left-3 top-3 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="renderRecordsTable()" placeholder="Search Consumer Name or ID..." class="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+                    </div>
+                    <button onclick="exportToCSV()" title="Export CSV Data" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm">
+                        <i class="fa-solid fa-file-csv"></i>
+                        <span class="hidden sm:inline">Export CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
+                            <tr>
+                                <th class="py-3.5 px-4">ID</th>
+                                <th class="py-3.5 px-4">Consumer Details</th>
+                                <th class="py-3.5 px-4">Readings (Prev → Curr)</th>
+                                <th class="py-3.5 px-4 text-right">Units</th>
+                                <th class="py-3.5 px-4 text-right">Energy Charge</th>
+                                <th class="py-3.5 px-4 text-right">Duty (5%)</th>
+                                <th class="py-3.5 px-4 text-right">Total Bill</th>
+                                <th class="py-3.5 px-4 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-slate-700 font-medium">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyTableState" class="hidden py-12 text-center">
+                    <i class="fa-solid fa-box-open text-4xl text-slate-300 mb-3"></i>
+                    <p class="text-slate-600 font-bold">No electricity records available</p>
+                    <p class="text-xs text-slate-400 mt-1">Add a new record or click "Load Sample Data".</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: ANALYTICS DASHBOARD ================= -->
+        <section id="tab-analytics" class="tab-content hidden space-y-6">
+
+            <!-- Stat KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total Bills Recorded</p>
+                        <h3 id="stat-total-bills" class="text-2xl font-black text-slate-900 font-mono mt-1">0</h3>
+                    </div>
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <i class="fa-solid fa-receipt text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total Units Consumed</p>
+                        <h3 id="stat-total-units" class="text-2xl font-black text-slate-900 font-mono mt-1">0 units</h3>
+                    </div>
+                    <div class="p-3 bg-sky-50 text-sky-600 rounded-xl">
+                        <i class="fa-solid fa-bolt text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Total Billed Amount</p>
+                        <h3 id="stat-total-amount" class="text-2xl font-black text-slate-900 font-mono mt-1">Rs. 0.00</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                        <i class="fa-solid fa-indian-rupee-sign text-xl"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Average Bill Amount</p>
+                        <h3 id="stat-avg-bill" class="text-2xl font-black text-slate-900 font-mono mt-1">Rs. 0.00</h3>
+                    </div>
+                    <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <i class="fa-solid fa-calculator text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Analysis Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Highest Consumption Card (C Code logic) -->
+                <div class="lg:col-span-5 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-lg border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                                <i class="fa-solid fa-trophy"></i>
+                                Highest Consumption Record
+                            </span>
+                            <span id="highest-category-badge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                None
+                            </span>
+                        </div>
+
+                        <div id="highest-consumer-container">
+                            <h3 id="highest-name" class="text-xl font-bold text-white">No Records Saved</h3>
+                            <p id="highest-id" class="text-xs text-slate-400 font-mono mt-0.5">ID: --</p>
+
+                            <div class="mt-6 grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                                <div>
+                                    <span class="text-[11px] text-slate-400 block font-medium">Consumption</span>
+                                    <span id="highest-units" class="text-2xl font-extrabold text-amber-400 font-mono">0 units</span>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] text-slate-400 block font-medium">Billed Amount</span>
+                                    <span id="highest-amount" class="text-2xl font-extrabold text-white font-mono">Rs. 0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t border-slate-800/80 text-xs text-slate-400 flex justify-between items-center">
+                        <span>Average units per bill:</span>
+                        <span id="stat-avg-units" class="font-mono text-white font-bold">0 units</span>
+                    </div>
+                </div>
+
+                <!-- Consumption Visual Chart -->
+                <div class="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                    <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center justify-between">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-amber-500"></i>
+                            Recent Consumption & Bill Trends
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-normal">Last 10 Records</span>
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="consumptionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PRINTABLE RECEIPT MODAL -->
+    <div id="printable-bill-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 text-slate-800 shadow-2xl border border-slate-200 relative overflow-hidden">
+            <div class="text-center pb-4 border-b border-slate-200">
+                <h2 class="text-lg font-black text-slate-900 uppercase tracking-wide">Electricity Bill Receipt</h2>
+                <p class="text-xs text-slate-500">PowerPulse Utility Services</p>
+            </div>
+
+            <div class="py-4 space-y-2 text-xs font-mono">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Consumer ID:</span>
+                    <span id="modal-id" class="font-bold text-slate-900">#1001</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Consumer Name:</span>
+                    <span id="modal-name" class="font-bold text-slate-900">N/A</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Address:</span>
+                    <span id="modal-address" class="font-bold text-slate-900 truncate max-w-[200px]">N/A</span>
+                </div>
+                <div class="border-t border-dashed border-slate-300 my-2"></div>
+                <div class="flex justify-between">
+                    <span>Previous Reading:</span>
+                    <span id="modal-prev-reading">0.00 units</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Current Reading:</span>
+                    <span id="modal-curr-reading">0.00 units</span>
+                </div>
+                <div class="flex justify-between font-bold text-slate-900">
+                    <span>Units Consumed:</span>
+                    <span id="modal-units">0.00 units</span>
+                </div>
+                <div class="border-t border-dashed border-slate-300 my-2"></div>
+                <div class="flex justify-between">
+                    <span>Energy Charge:</span>
+                    <span id="modal-energy">Rs. 0.00</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Fixed Charge:</span>
+                    <span>Rs. 100.00</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Electricity Duty (5%):</span>
+                    <span id="modal-duty">Rs. 0.00</span>
+                </div>
+                <div class="border-t border-slate-300 pt-2 mt-2 flex justify-between text-sm font-bold text-slate-900">
+                    <span>TOTAL BILL:</span>
+                    <span id="modal-total">Rs. 0.00</span>
+                </div>
+            </div>
+
+            <div class="pt-4 flex gap-3 no-print">
+                <button onclick="window.print()" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Print Receipt</span>
+                </button>
+                <button onclick="closePrintModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        // C Code Defines
+        const FIXED_CHARGE = 100.0;
+        const DUTY_RATE = 0.05;
+        const STORAGE_KEY = 'electricity_records_db';
+
+        let records = [];
+        let chartInstance = null;
+
+        // On DOM Load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadRecordsFromStorage();
+            updateAutoIdBadge();
+            liveCalculate();
+            renderAnalytics();
+        });
+
+        // 1. Calculate energy charge based on progressive slabs (C Code)
+        function calculateEnergyCharge(units) {
+            let charge = 0.0;
+            let tempUnits = units;
+
+            if (tempUnits > 500) {
+                charge += (tempUnits - 500) * 7.50;
+                tempUnits = 500;
+            }
+            if (tempUnits > 200) {
+                charge += (tempUnits - 200) * 6.00;
+                tempUnits = 200;
+            }
+            if (tempUnits > 100) {
+                charge += (tempUnits - 100) * 4.50;
+                tempUnits = 100;
+            }
+            charge += tempUnits * 3.00;
+
+            return charge;
+        }
+
+        // 2. Full Bill Calculation Helper
+        function calculateBillDetails(prevReading, currReading) {
+            const units = Math.max(0, currReading - prevReading);
+            const energyCharge = calculateEnergyCharge(units);
+            const duty = energyCharge * DUTY_RATE;
+            const totalBill = energyCharge + FIXED_CHARGE + duty;
+
+            return {
+                units,
+                energyCharge,
+                fixedCharge: FIXED_CHARGE,
+                duty,
+                totalBill
+            };
+        }
+
+        // Generate ID starting at 1001 (C Code generateID)
+        function generateID() {
+            if (records.length === 0) return 1001;
+            const maxID = records.reduce((max, r) => r.id > max ? r.id : max, 1000);
+            return maxID + 1;
+        }
+
+        // Find latest record for an existing consumer (C Code findPreviousRecord)
+        function findPreviousRecord(id) {
+            const matches = records.filter(r => r.id === parseInt(id));
+            if (matches.length === 0) return null;
+            return matches[matches.length - 1];
+        }
+
+        // Tab Navigation
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('bg-amber-500', 'text-slate-950', 'shadow');
+                btn.classList.add('text-slate-300', 'hover:bg-slate-800');
+            });
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-amber-500', 'text-slate-950', 'shadow');
+                activeBtn.classList.remove('text-slate-300', 'hover:bg-slate-800');
+            }
+
+            document.querySelectorAll('.mobile-nav-tab').forEach(btn => {
+                btn.classList.remove('text-amber-400');
+                btn.classList.add('text-slate-400');
+            });
+            const activeMobile = document.getElementById(`mobile-tab-${tabName}`);
+            if (activeMobile) activeMobile.classList.add('text-amber-400');
+
+            if (tabName === 'records') renderRecordsTable();
+            if (tabName === 'analytics') renderAnalytics();
+        }
+
+        // Toggle New Consumer / Existing Consumer modes
+        function toggleConsumerType() {
+            const type = document.querySelector('input[name="consumerType"]:checked').value;
+            const existingSelectGroup = document.getElementById('existing-consumer-lookup');
+            const nameInput = document.getElementById('consumerName');
+            const addressInput = document.getElementById('consumerAddress');
+            const prevReadingInput = document.getElementById('previousReading');
+
+            if (type === 'new') {
+                existingSelectGroup.classList.add('hidden');
+                nameInput.value = '';
+                nameInput.removeAttribute('readonly');
+                addressInput.value = '';
+                addressInput.removeAttribute('readonly');
+                prevReadingInput.value = 0;
+                updateAutoIdBadge();
+            } else {
+                existingSelectGroup.classList.remove('hidden');
+                populateExistingConsumerDropdown();
+                nameInput.value = '';
+                addressInput.value = '';
+                prevReadingInput.value = 0;
+            }
+            liveCalculate();
+        }
+
+        function populateExistingConsumerDropdown() {
+            const select = document.getElementById('existingConsumerSelect');
+            select.innerHTML = '<option value="">-- Choose Existing Consumer --</option>';
+
+            const uniqueMap = new Map();
+            records.forEach(r => uniqueMap.set(r.id, r));
+
+            uniqueMap.forEach((consumer, id) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = `ID #${id} - ${consumer.name}`;
+                select.appendChild(opt);
+            });
+        }
+
+        function loadExistingConsumerData() {
+            const id = document.getElementById('existingConsumerSelect').value;
+            if (!id) return;
+
+            const prevRecord = findPreviousRecord(id);
+            if (prevRecord) {
+                document.getElementById('consumerIdDisplay').value = prevRecord.id;
+                document.getElementById('consumerName').value = prevRecord.name;
+                document.getElementById('consumerName').setAttribute('readonly', 'true');
+                document.getElementById('consumerAddress').value = prevRecord.address;
+                document.getElementById('consumerAddress').setAttribute('readonly', 'true');
+                document.getElementById('previousReading').value = prevRecord.currentReading;
+                liveCalculate();
+            }
+        }
+
+        function updateAutoIdBadge() {
+            const type = document.querySelector('input[name="consumerType"]:checked').value;
+            if (type === 'new') {
+                const nextId = generateID();
+                document.getElementById('consumerIdDisplay').value = nextId;
+                document.getElementById('auto-id-badge').textContent = `Auto ID: #${nextId}`;
+            }
+        }
+
+        // Live calculation preview
+        function liveCalculate() {
+            const prevReading = parseFloat(document.getElementById('previousReading').value) || 0;
+            const currReading = parseFloat(document.getElementById('currentReading').value) || 0;
+            const name = document.getElementById('consumerName').value.trim() || 'Select / Fill Consumer';
+            const id = document.getElementById('consumerIdDisplay').value || '----';
+
+            const calc = calculateBillDetails(prevReading, currReading);
+
+            document.getElementById('preview-consumer-name').textContent = name;
+            document.getElementById('preview-id-tag').textContent = `#${id}`;
+            document.getElementById('preview-units').textContent = `${calc.units.toFixed(2)} units`;
+            document.getElementById('preview-energy').textContent = `Rs. ${calc.energyCharge.toFixed(2)}`;
+            document.getElementById('preview-duty').textContent = `Rs. ${calc.duty.toFixed(2)}`;
+            document.getElementById('preview-total').textContent = `Rs. ${calc.totalBill.toFixed(2)}`;
+            document.getElementById('preview-slab-summary').textContent = `${calc.units.toFixed(1)} units total`;
+
+            // Update progressive slab bar
+            const total = Math.max(calc.units, 1);
+            const u = calc.units;
+            const s1 = Math.min(u, 100);
+            const s2 = Math.min(Math.max(u - 100, 0), 100);
+            const s3 = Math.min(Math.max(u - 200, 0), 300);
+            const s4 = Math.max(u - 500, 0);
+
+            document.getElementById('slab-bar-1').style.width = `${(s1 / total) * 100}%`;
+            document.getElementById('slab-bar-2').style.width = `${(s2 / total) * 100}%`;
+            document.getElementById('slab-bar-3').style.width = `${(s3 / total) * 100}%`;
+            document.getElementById('slab-bar-4').style.width = `${(s4 / total) * 100}%`;
+
+            // Trend Alert Check (C Code comparison)
+            const type = document.querySelector('input[name="consumerType"]:checked').value;
+            const trendBanner = document.getElementById('trend-banner');
+
+            if (type === 'existing' && id !== '----') {
+                const prevRecord = findPreviousRecord(id);
+                if (prevRecord && currReading >= prevReading) {
+                    const prevUnits = prevRecord.units;
+                    const diff = calc.units - prevUnits;
+                    trendBanner.classList.remove('hidden', 'bg-emerald-950/60', 'text-emerald-300', 'bg-amber-950/60', 'text-amber-300', 'bg-slate-800', 'text-slate-300');
+
+                    if (diff > 0) {
+                        trendBanner.classList.add('bg-amber-950/60', 'text-amber-300');
+                        document.getElementById('trend-text').innerHTML = `<i class="fa-solid fa-arrow-trend-up"></i> Alert: Electricity consumption increased`;
+                        document.getElementById('trend-delta').textContent = `+${diff.toFixed(2)} units`;
+                    } else if (diff < 0) {
+                        trendBanner.classList.add('bg-emerald-950/60', 'text-emerald-300');
+                        document.getElementById('trend-text').innerHTML = `<i class="fa-solid fa-arrow-trend-down"></i> Good: Electricity consumption decreased`;
+                        document.getElementById('trend-delta').textContent = `${diff.toFixed(2)} units`;
+                    } else {
+                        trendBanner.classList.add('bg-slate-800', 'text-slate-300');
+                        document.getElementById('trend-text').innerHTML = `<i class="fa-solid fa-minus"></i> Consumption is unchanged`;
+                        document.getElementById('trend-delta').textContent = `0.00 units`;
+                    }
+                } else {
+                    trendBanner.classList.add('hidden');
+                }
+            } else {
+                trendBanner.classList.add('hidden');
+            }
+        }
+
+        // Submit form
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('consumerName').value.trim();
+            const address = document.getElementById('consumerAddress').value.trim();
+            const prevReading = parseFloat(document.getElementById('previousReading').value) || 0;
+            const currReading = parseFloat(document.getElementById('currentReading').value) || 0;
+            const id = parseInt(document.getElementById('consumerIdDisplay').value);
+
+            if (currReading < prevReading) {
+                showToast("Error: Current reading cannot be less than previous reading.", "error");
+                return;
+            }
+
+            const calc = calculateBillDetails(prevReading, currReading);
+            const prevRecord = findPreviousRecord(id);
+            const previousUnits = prevRecord ? prevRecord.units : 0;
+
+            const record = {
+                id,
+                name,
+                address,
+                previousReading: prevReading,
+                currentReading: currReading,
+                previousUnits,
+                units: calc.units,
+                energyCharge: calc.energyCharge,
+                duty: calc.duty,
+                totalBill: calc.totalBill,
+                timestamp: new Date().toISOString()
+            };
+
+            records.push(record);
+            saveRecordsToStorage();
+            showToast(`Bill saved successfully for ${name} (#${id})`, "success");
+
+            resetForm();
+            updateAutoIdBadge();
+        }
+
+        function resetForm() {
+            document.getElementById('billForm').reset();
+            document.querySelector('input[name="consumerType"][value="new"]').checked = true;
+            toggleConsumerType();
+        }
+
+        // Render records table
+        function renderRecordsTable() {
+            const tbody = document.getElementById('recordsTableBody');
+            const emptyState = document.getElementById('emptyTableState');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+
+            tbody.innerHTML = '';
+
+            const filtered = records.filter(r => 
+                r.name.toLowerCase().includes(searchVal) || 
+                r.id.toString().includes(searchVal)
+            );
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.slice().reverse().forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-bold text-slate-900">#${r.id}</td>
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-800">${escapeHtml(r.name)}</div>
+                        <div class="text-[11px] text-slate-400 truncate max-w-xs">${escapeHtml(r.address)}</div>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-600">
+                        ${r.previousReading.toFixed(2)} → <span class="font-bold text-slate-900">${r.currentReading.toFixed(2)}</span>
+                    </td>
+                    <td class="py-3 px-4 text-right font-mono font-bold text-slate-900">${r.units.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-right font-mono text-slate-600">Rs. ${r.energyCharge.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-right font-mono text-slate-600">Rs. ${r.duty.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-right font-mono font-bold text-amber-600">Rs. ${r.totalBill.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="deleteRecord('${r.timestamp}')" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete Record">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteRecord(timestamp) {
+            records = records.filter(r => r.timestamp !== timestamp);
+            saveRecordsToStorage();
+            renderRecordsTable();
+            showToast("Record deleted", "info");
+        }
+
+        // Render Analytics (C Code analyzeConsumption logic)
+        function renderAnalytics() {
+            const count = records.length;
+            let totalUnits = 0;
+            let totalAmount = 0;
+            let highestRecord = null;
+
+            records.forEach(r => {
+                totalUnits += r.units;
+                totalAmount += r.totalBill;
+                if (!highestRecord || r.units > highestRecord.units) {
+                    highestRecord = r;
+                }
+            });
+
+            document.getElementById('stat-total-bills').textContent = count;
+            document.getElementById('stat-total-units').textContent = `${totalUnits.toFixed(2)} units`;
+            document.getElementById('stat-total-amount').textContent = `Rs. ${totalAmount.toFixed(2)}`;
+            document.getElementById('stat-avg-bill').textContent = count > 0 ? `Rs. ${(totalAmount / count).toFixed(2)}` : 'Rs. 0.00';
+            document.getElementById('stat-avg-units').textContent = count > 0 ? `${(totalUnits / count).toFixed(2)} units` : '0 units';
+
+            const categoryBadge = document.getElementById('highest-category-badge');
+            if (highestRecord) {
+                document.getElementById('highest-name').textContent = highestRecord.name;
+                document.getElementById('highest-id').textContent = `ID #${highestRecord.id} • ${highestRecord.address}`;
+                document.getElementById('highest-units').textContent = `${highestRecord.units.toFixed(2)} units`;
+                document.getElementById('highest-amount').textContent = `Rs. ${highestRecord.totalBill.toFixed(2)}`;
+
+                const u = highestRecord.units;
+                if (u <= 100) {
+                    categoryBadge.textContent = "Low Consumption";
+                    categoryBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-700";
+                } else if (u <= 300) {
+                    categoryBadge.textContent = "Moderate Consumption";
+                    categoryBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-amber-950 text-amber-300 border border-amber-700";
+                } else {
+                    categoryBadge.textContent = "High Consumption";
+                    categoryBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-700";
+                }
+            } else {
+                document.getElementById('highest-name').textContent = "No Records Saved";
+                document.getElementById('highest-id').textContent = "ID: --";
+                document.getElementById('highest-units').textContent = "0 units";
+                document.getElementById('highest-amount').textContent = "Rs. 0.00";
+                categoryBadge.textContent = "None";
+                categoryBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700";
+            }
+
+            renderChart();
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('consumptionChart').getContext('2d');
+            const recent = records.slice(-10);
+            const labels = recent.map(r => `${r.name} (#${r.id})`);
+            const dataUnits = recent.map(r => r.units);
+            const dataBills = recent.map(r => r.totalBill);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length > 0 ? labels : ['No Data'],
+                    datasets: [
+                        {
+                            label: 'Units Consumed',
+                            data: dataUnits.length > 0 ? dataUnits : [0],
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Total Bill (Rs.)',
+                            data: dataBills.length > 0 ? dataBills : [0],
+                            type: 'line',
+                            borderColor: '#0284c7',
+                            backgroundColor: '#0284c7',
+                            borderWidth: 2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Units', font: { size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Amount (Rs.)', font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // Print Receipt Modal
+        function openPrintModal() {
+            const name = document.getElementById('consumerName').value.trim() || 'Guest Consumer';
+            const address = document.getElementById('consumerAddress').value.trim() || 'N/A';
+            const id = document.getElementById('consumerIdDisplay').value || '----';
+            const prevReading = parseFloat(document.getElementById('previousReading').value) || 0;
+            const currReading = parseFloat(document.getElementById('currentReading').value) || 0;
+
+            const calc = calculateBillDetails(prevReading, currReading);
+
+            document.getElementById('modal-id').textContent = `#${id}`;
+            document.getElementById('modal-name').textContent = name;
+            document.getElementById('modal-address').textContent = address;
+            document.getElementById('modal-prev-reading').textContent = `${prevReading.toFixed(2)} units`;
+            document.getElementById('modal-curr-reading').textContent = `${currReading.toFixed(2)} units`;
+            document.getElementById('modal-units').textContent = `${calc.units.toFixed(2)} units`;
+            document.getElementById('modal-energy').textContent = `Rs. ${calc.energyCharge.toFixed(2)}`;
+            document.getElementById('modal-duty').textContent = `Rs. ${calc.duty.toFixed(2)}`;
+            document.getElementById('modal-total').textContent = `Rs. ${calc.totalBill.toFixed(2)}`;
+
+            document.getElementById('printable-bill-modal').classList.remove('hidden');
+        }
+
+        function closePrintModal() {
+            document.getElementById('printable-bill-modal').classList.add('hidden');
+        }
+
+        // Persistence Helpers
+        function saveRecordsToStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        }
+
+        function loadRecordsFromStorage() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            records = data ? JSON.parse(data) : [];
+        }
+
+        function clearAllData() {
+            if (confirm("Are you sure you want to clear all electricity records?")) {
+                records = [];
+                saveRecordsToStorage();
+                renderRecordsTable();
+                renderAnalytics();
+                updateAutoIdBadge();
+                showToast("All data cleared", "info");
+            }
+        }
+
+        function seedDemoData() {
+            records = [
+                { id: 1001, name: "Aman Gupta", address: "12 Park Avenue, Delhi", previousReading: 0, currentReading: 90, previousUnits: 0, units: 90, energyCharge: 270, duty: 13.5, totalBill: 383.5, timestamp: new Date(Date.now() - 86400000 * 5).toISOString() },
+                { id: 1002, name: "Suresh Verma", address: "45 GT Road, Kanpur", previousReading: 0, currentReading: 250, previousUnits: 0, units: 250, energyCharge: 1050, duty: 52.5, totalBill: 1202.5, timestamp: new Date(Date.now() - 86400000 * 3).toISOString() },
+                { id: 1001, name: "Aman Gupta", address: "12 Park Avenue, Delhi", previousReading: 90, currentReading: 230, previousUnits: 90, units: 140, energyCharge: 480, duty: 24, totalBill: 604, timestamp: new Date(Date.now() - 86400000 * 1).toISOString() },
+                { id: 1003, name: "Ritu Sharma", address: "88 Commercial Hub, Mumbai", previousReading: 0, currentReading: 650, previousUnits: 0, units: 650, energyCharge: 3675, duty: 183.75, totalBill: 3958.75, timestamp: new Date().toISOString() }
+            ];
+            saveRecordsToStorage();
+            renderRecordsTable();
+            renderAnalytics();
+            updateAutoIdBadge();
+            showToast("Sample C Code records loaded!", "success");
+        }
+
+        function exportToCSV() {
+            if (records.length === 0) {
+                showToast("No data to export", "error");
+                return;
+            }
+            let csv = "ID,Name,Address,PrevReading,CurrReading,Units,EnergyCharge,Duty,TotalBill\n";
+            records.forEach(r => {
+                csv += `"${r.id}","${r.name}","${r.address}",${r.previousReading},${r.currentReading},${r.units},${r.energyCharge},${r.duty},${r.totalBill}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `electricity_records_${new Date().toISOString().slice(0,10)}.csv`);
+            a.click();
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-800 text-white' : type === 'error' ? 'bg-rose-800 text-white' : 'bg-slate-800 text-white';
+            
+            toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2 transition-all duration-300 transform translate-y-2 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<span>${message}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
